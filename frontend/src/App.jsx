@@ -15,6 +15,7 @@ function App() {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -24,16 +25,43 @@ function App() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsAnalyzing(true);
     setResult(null);
+    setError(null);
     
-    // Simulate analysis delay
-    setTimeout(() => {
+    try {
+      const payload = {
+        step: Number(formData.step),
+        type: formData.type,
+        amount: Number(formData.amount),
+        oldbalanceOrg: Number(formData.oldbalanceOrg),
+        newbalanceOrig: Number(formData.newbalanceOrig),
+        oldbalanceDest: Number(formData.oldbalanceDest),
+        newbalanceDest: Number(formData.newbalanceDest),
+        isFlaggedFraud: Number(formData.isFlaggedFraud)
+      };
+
+      const response = await fetch("http://127.0.0.1:8000/predict", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setResult(data);
+    } catch (err) {
+      setError(err.message || "Failed to connect to the backend API.");
+    } finally {
       setIsAnalyzing(false);
-      setResult("Form ready for analysis");
-    }, 1500);
+    }
   };
 
   return (
@@ -203,10 +231,40 @@ function App() {
                 )}
               </button>
 
+              {error && (
+                <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-center w-full max-w-md animate-[pulse_0.5s_ease-in-out]">
+                  <p className="font-medium text-sm">❌ {error}</p>
+                </div>
+              )}
+
               {result && (
-                <div className="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-400 text-center w-full max-w-md animate-[pulse_0.5s_ease-in-out]">
-                  <Activity className="w-6 h-6 mx-auto mb-2" />
-                  <p className="font-medium">{result}</p>
+                <div className={`mt-6 p-6 border rounded-xl text-center w-full max-w-md shadow-xl animate-[pulse_0.5s_ease-in-out] ${
+                  result.prediction === 1 
+                    ? "bg-red-950/40 border-red-500/30 shadow-red-900/20" 
+                    : "bg-emerald-950/40 border-emerald-500/30 shadow-emerald-900/20"
+                }`}>
+                  <div className="flex justify-center mb-3">
+                    {result.prediction === 1 ? (
+                      <div className="p-3 bg-red-500/20 rounded-full">
+                        <Activity className="w-8 h-8 text-red-400" />
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-emerald-500/20 rounded-full">
+                        <ShieldCheck className="w-8 h-8 text-emerald-400" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  <h3 className={`text-2xl font-bold mb-1 ${result.prediction === 1 ? "text-red-400" : "text-emerald-400"}`}>
+                    {result.result}
+                  </h3>
+                  
+                  <div className="mt-4 pt-4 border-t border-slate-700/50">
+                    <p className="text-sm text-slate-400 uppercase tracking-wider mb-1">Fraud Probability</p>
+                    <p className={`text-xl font-semibold ${result.prediction === 1 ? "text-red-300" : "text-emerald-300"}`}>
+                      {(result.fraud_probability * 100).toFixed(2)}%
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
